@@ -27,6 +27,11 @@ import {
   Send,
   LayoutList,
   Clock,
+  Download,
+  ShieldCheck,
+  XCircle,
+  Info,
+  MonitorCheck,
 } from "lucide-react";
 import { parseHungarianText } from "@/lib/parser";
 import {
@@ -35,6 +40,13 @@ import {
   generateNyomtathatoAjanlat,
   validateAjanlatAdatok,
 } from "@/lib/kimenet";
+import {
+  validateForExport,
+  generateVisualWindowExport,
+  generateKlaesCSV,
+  downloadFile,
+  generateFilename,
+} from "@/lib/export";
 import type { AjanlatAdatok, Tetel, UgyfelAdatok, AjanlatStatusz } from "@/lib/types";
 import {
   URES_UGYFEL,
@@ -418,6 +430,32 @@ export default function Demo() {
   const emailSzoveg = generateUgyfelEmail(ajanlat);
   const nyomtathatoSzoveg = generateNyomtathatoAjanlat(ajanlat);
 
+  // Export validation
+  const exportValidation = validateForExport(ajanlat);
+  const vwSzoveg = generateVisualWindowExport(ajanlat);
+
+  const handleVWCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(vwSzoveg);
+      toast.success("Visual Window összesítő vágólapra másolva!");
+    } catch {
+      toast.error("Másolás sikertelen");
+    }
+  };
+
+  const handleKlaesDownload = () => {
+    const csv = generateKlaesCSV(ajanlat);
+    const filename = generateFilename(ajanlat, "klaes", "csv");
+    downloadFile(csv, filename, "text/csv");
+    toast.success(`Klaes CSV letöltve: ${filename}`);
+  };
+
+  const handleVWDownload = () => {
+    const filename = generateFilename(ajanlat, "visual-window", "txt");
+    downloadFile(vwSzoveg, filename, "text/plain");
+    toast.success(`Visual Window összesítő letöltve: ${filename}`);
+  };
+
   const handlePrint = () => {
     const w = window.open("", "_blank");
     if (w) {
@@ -649,11 +687,165 @@ export default function Demo() {
               ))}
             </div>
 
+            {/* ══ EXPORT VALIDATION PANEL ══ */}
+            <div className={`rounded-xl border-2 shadow-sm overflow-hidden ${
+              exportValidation.exportable
+                ? "border-green-300 bg-green-50"
+                : "border-red-200 bg-red-50"
+            }`}>
+              {/* Header */}
+              <div className={`px-5 py-3.5 flex items-center justify-between border-b ${
+                exportValidation.exportable ? "border-green-200 bg-green-100/60" : "border-red-200 bg-red-100/60"
+              }`}>
+                <div className="flex items-center gap-2.5">
+                  {exportValidation.exportable ? (
+                    <ShieldCheck className="w-5 h-5 text-green-700" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  )}
+                  <div>
+                    <div className={`text-sm font-bold font-[Figtree] ${
+                      exportValidation.exportable ? "text-green-800" : "text-red-800"
+                    }`}>
+                      {exportValidation.exportable
+                        ? "Exportálható – minden kötelező adat megvan"
+                        : `Nem exportálható – ${exportValidation.errors.length} hiba javítandó`}
+                    </div>
+                    <div className={`text-xs mt-0.5 ${
+                      exportValidation.exportable ? "text-green-600" : "text-red-600"
+                    }`}>
+                      Adatminőség: {exportValidation.score}/100
+                      {exportValidation.warnings.length > 0 && ` · ${exportValidation.warnings.length} figyelmeztetés`}
+                    </div>
+                  </div>
+                </div>
+                {/* Score bar */}
+                <div className="hidden sm:flex items-center gap-2">
+                  <div className="w-24 h-2 rounded-full bg-white/60 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        exportValidation.score >= 80 ? "bg-green-500" :
+                        exportValidation.score >= 50 ? "bg-amber-500" : "bg-red-500"
+                      }`}
+                      style={{ width: `${exportValidation.score}%` }}
+                    />
+                  </div>
+                  <span className={`text-xs font-bold ${
+                    exportValidation.score >= 80 ? "text-green-700" :
+                    exportValidation.score >= 50 ? "text-amber-700" : "text-red-700"
+                  }`}>{exportValidation.score}%</span>
+                </div>
+              </div>
+
+              {/* Errors */}
+              {exportValidation.errors.length > 0 && (
+                <div className="px-5 py-3 space-y-1.5 border-b border-red-200">
+                  <div className="text-xs font-semibold text-red-700 mb-1.5 flex items-center gap-1">
+                    <XCircle className="w-3.5 h-3.5" /> Hibák (exportálás előtt javítandó)
+                  </div>
+                  {exportValidation.errors.map((e, i) => (
+                    <div key={i} className="flex items-start gap-1.5 text-xs text-red-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 mt-1" />
+                      {e.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Warnings */}
+              {exportValidation.warnings.length > 0 && (
+                <div className="px-5 py-3 space-y-1.5 border-b border-amber-200/60">
+                  <div className="text-xs font-semibold text-amber-700 mb-1.5 flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Figyelmeztetések (ajánlott ellenőrizni)
+                  </div>
+                  {exportValidation.warnings.map((w, i) => (
+                    <div key={i} className="flex items-start gap-1.5 text-xs text-amber-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0 mt-1" />
+                      {w.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Export buttons */}
+              <div className="px-5 py-4">
+                <div className="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5">
+                  <MonitorCheck className="w-3.5 h-3.5" /> Rendszer-export
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Visual Window */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: "oklch(0.32 0.09 152)" }}>VW</div>
+                      <div>
+                        <div className="text-xs font-bold text-gray-800 font-[Figtree]">Visual Window</div>
+                        <div className="text-xs text-gray-400">Strukturált beviteli összesítő</div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+                      A Visual Window manuális beviteli sorrendjének megfelelő, tételenkénti összesítő. Másolható vagy letölthető.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleVWCopy}
+                        disabled={!exportValidation.exportable}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={exportValidation.exportable ? { borderColor: "oklch(0.32 0.09 152)", color: "oklch(0.32 0.09 152)", background: "oklch(0.97 0.005 152)" } : {}}
+                      >
+                        <Copy className="w-3.5 h-3.5" /> Másolás
+                      </button>
+                      <button
+                        onClick={handleVWDownload}
+                        disabled={!exportValidation.exportable}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg text-white transition-all hover:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={exportValidation.exportable ? { background: "oklch(0.32 0.09 152)" } : { background: "oklch(0.7 0 0)" }}
+                      >
+                        <Download className="w-3.5 h-3.5" /> .txt letöltés
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Klaes */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: "oklch(0.30 0.08 260)" }}>KL</div>
+                      <div>
+                        <div className="text-xs font-bold text-gray-800 font-[Figtree]">Klaes</div>
+                        <div className="text-xs text-gray-400">CSV import formátum</div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+                      Klaes-kompatibilis CSV fájl (;-elválasztó, UTF-8 BOM) a standard oszlopsorrendben. Importálható a Klaes rendszerbe.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleKlaesDownload}
+                        disabled={!exportValidation.exportable}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg text-white transition-all hover:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={exportValidation.exportable ? { background: "oklch(0.30 0.08 260)" } : { background: "oklch(0.7 0 0)" }}
+                      >
+                        <Download className="w-3.5 h-3.5" /> .csv letöltés
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {!exportValidation.exportable && (
+                  <div className="mt-3 flex items-start gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    <Info className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-700">
+                      Az export gombok inaktívak, amíg a fenti hibák nem kerülnek javításra. Menj vissza a 2. lépésre és töltsd ki a hiányzó mezőket.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Output tabs */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="border-b border-gray-100 px-5 py-3 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-green-700" />
-                <h2 className="text-sm font-semibold text-gray-800 font-[Figtree]">Generált kimenetek</h2>
+                <h2 className="text-sm font-semibold text-gray-800 font-[Figtree]">Egyéb kimenetek</h2>
               </div>
 
               {/* Tab bar */}
