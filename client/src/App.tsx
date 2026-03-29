@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Landing from "./pages/Landing";
 import Demo from "./pages/Demo";
+import Integracio from "./pages/Integracio";
 
 function Router() {
   return (
@@ -15,6 +16,8 @@ function Router() {
       <Route path="/landing" component={Landing} />
       {/* 3-step demo flow */}
       <Route path="/demo" component={Demo} />
+      {/* AI integration showcase page */}
+      <Route path="/integracio" component={Integracio} />
       {/* Original quotation preparation tool */}
       <Route path="/" component={Home} />
       <Route path="/404" component={NotFound} />
