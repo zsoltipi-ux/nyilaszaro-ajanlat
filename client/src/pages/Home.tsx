@@ -9,6 +9,7 @@
 import React, { useState, useCallback } from "react";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 import {
   User,
   FolderOpen,
@@ -27,6 +28,7 @@ import {
   Home as HomeIcon,
   Menu,
   X,
+  ExternalLink,
 } from "lucide-react";
 
 import SectionCard from "@/components/SectionCard";
@@ -183,6 +185,7 @@ function OutputBlock({
 }
 
 export default function Home() {
+  const [, setLocation] = useLocation();
   const [ajanlat, setAjanlat] = useLocalStorage<AjanlatAdatok>(
     "nyilaszaro-ajanlat-v1",
     INITIAL_AJANLAT
@@ -379,9 +382,15 @@ export default function Home() {
               ))}
             </nav>
 
-            {/* Right actions */}
-            <div className="flex items-center gap-2">
-              <StatusBadge statusz={ajanlat.statusz} />
+              {/* Right actions */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setLocation("/landing")}
+                  className="hidden sm:inline-flex items-center gap-1 text-xs text-green-200 hover:text-white border border-green-600/40 px-2.5 py-1 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" /> Landing
+                </button>
+                <StatusBadge statusz={ajanlat.statusz} />
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="md:hidden p-1.5 rounded-md text-green-200 hover:text-white hover:bg-white/10 transition-colors"
